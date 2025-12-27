@@ -1,0 +1,17 @@
+
+# environment files
+.env
+*.env.local
+
+# VSCODE
+.vscode
+.history
+
+
+# Python - virtrualenv
+.venv/
+
+# Database OS Files
+.DS_Store
+Thumbs.db
+
