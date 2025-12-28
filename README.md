@@ -35,6 +35,48 @@ You'll need:
 - Node.js and npm (for the frontend)
 - A virtual environment tool (we use venv)
 
+### Database Setup (Quick Start)
+
+The easiest way to set up the database is using our automated setup script:
+
+1. **Navigate to the database folder:**
+   ```bash
+   cd database
+   ```
+
+2. **Run the setup script:**
+   ```bash
+   ./setup.sh
+   ```
+
+   The script will:
+   - Create the database (default: `piaxis_db`)
+   - Install the pgvector extension
+   - Create all tables (details, detail_usage_rules, users)
+   - Apply Row-Level Security policies
+   - Load sample data
+   - Test that RLS is working correctly
+
+3. **Copy the generated DATABASE_URL** to your `backend/.env` file
+
+**Manual Setup (Alternative):**
+
+If you prefer to set up manually or the script doesn't work:
+
+```bash
+# Connect to PostgreSQL
+psql -U postgres
+
+# Create database
+CREATE DATABASE piaxis_db;
+\c piaxis_db
+
+# Run the schema, policies, and seed files
+\i schema.sql
+\i rls_policies.sql
+\i seed.sql
+```
+
 ### Backend Setup
 
 1. **Navigate to the backend folder:**
@@ -142,6 +184,133 @@ Here's what you can do with the API:
 - `GET /security/details` - Get details based on user role
   - Requires headers: `X-USER-EMAIL` and `X-USER-ROLE`
   - Admins see everything, architects see standard details only
+
+## Row-Level Security (RLS)
+
+This app implements PostgreSQL Row-Level Security to control data access at the database level. This means different users see different data based on their role - and this protection happens in the database itself, not just in the application code.
+
+### How It Works
+
+We have two user roles:
+- **Admin** - Can see ALL details (both standard and premium)
+- **Architect** - Can only see standard details (premium is hidden)
+
+The database automatically filters rows based on who's asking for them. Even if someone bypasses the application code, the database won't let them see unauthorized data.
+
+### Testing RLS
+
+**Test as Admin (sees everything):**
+```bash
+curl -H "X-USER-ROLE: admin" http://localhost:8000/security/details
+```
+
+Expected result: Returns ALL 5 details (3 standard + 2 premium)
+
+**Test as Architect (sees standard only):**
+```bash
+curl -H "X-USER-ROLE: architect" http://localhost:8000/security/details
+```
+
+Expected result: Returns only 3 standard details (premium filtered out)
+
+**Test without role:**
+```bash
+curl http://localhost:8000/security/details
+```
+
+Expected result: 401 error - Missing X-USER-ROLE header
+
+### RLS Policies in the Database
+
+We've implemented three RLS policies on the `details` table:
+
+1. **admin_see_all** - Admins see everything
+   ```sql
+   -- If role = 'admin', show all rows
+   current_setting('app.current_user_role') = 'admin'
+   ```
+
+2. **architect_see_standard** - Architects see only standard details
+   ```sql
+   -- If role = 'architect', show only standard rows
+   current_setting('app.current_user_role') = 'architect'
+   AND (source = 'standard' OR source IS NULL)
+   ```
+
+3. **allow_when_no_role** - Fallback for testing (shows all)
+   ```sql
+   -- If no role set, show all (useful for development)
+   current_setting('app.current_user_role') IS NULL
+   ```
+
+### How to Switch Users/Roles
+
+**Via API:**
+Just change the header when making requests:
+
+```bash
+# As admin
+curl -H "X-USER-ROLE: admin" \
+     -H "X-USER-EMAIL: admin@piaxis.com" \
+     http://localhost:8000/security/details
+
+# As architect
+curl -H "X-USER-ROLE: architect" \
+     -H "X-USER-EMAIL: architect@piaxis.com" \
+     http://localhost:8000/security/details
+```
+
+**Via Database (for testing):**
+You can test the RLS policies directly in PostgreSQL:
+
+```sql
+-- Test as admin
+BEGIN;
+SET LOCAL app.current_user_role = 'admin';
+SELECT id, title, source FROM details;
+-- Should see 5 rows
+COMMIT;
+
+-- Test as architect
+BEGIN;
+SET LOCAL app.current_user_role = 'architect';
+SELECT id, title, source FROM details;
+-- Should see only 3 rows (standard)
+COMMIT;
+```
+
+### Test Users
+
+The database comes with two test users:
+
+| Email                  | Role      | Can See               |
+|------------------------|-----------|----------------------|
+| admin@piaxis.com       | admin     | All details (5)      |
+| architect@piaxis.com   | architect | Standard only (3)    |
+
+### Understanding the Implementation
+
+When you call the `/security/details` endpoint:
+
+1. Backend receives your role via the `X-USER-ROLE` header
+2. Backend sets a PostgreSQL session variable: `SET LOCAL app.current_user_role = 'admin'`
+3. Backend queries: `SELECT * FROM details` (no WHERE clause!)
+4. PostgreSQL RLS automatically filters rows based on the session variable
+5. You only get back the rows you're allowed to see
+
+This is better than application-level filtering because:
+- ✅ Database enforces it - can't be bypassed by buggy code
+- ✅ Works for all queries automatically
+- ✅ Centralized security logic
+- ✅ Defense in depth
+
+### Production Notes
+
+For production use, consider:
+- Remove the `allow_when_no_role` policy (it's just for development)
+- Implement proper JWT authentication instead of simple headers
+- Add audit logging to track who accessed what
+- Apply RLS to other tables (detail_usage_rules, users, etc.)
 
 ## Common Issues
 

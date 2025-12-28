@@ -6,7 +6,6 @@ from sqlalchemy import create_engine, text
 from dotenv import load_dotenv
 import os
 
-#Checking for RAG Integerations
 try:
     from rag_service import rag_suggest_detail, generate_embeddings_for_details
     RAG_AVAILABLE = True
@@ -26,25 +25,24 @@ if DATABASE_URL.startswith("postgresql://"):
 
 if "sslmode" not in DATABASE_URL:
     if "localhost" in DATABASE_URL or "127.0.0.1" in DATABASE_URL:
-        if "?" in DATABASE_URL: # For locally hosted postgress
+        if "?" in DATABASE_URL:
             DATABASE_URL += "&sslmode=disable"
         else:
             DATABASE_URL += "?sslmode=disable"
-    else:               # For Supabase Cloud
+    else:
         if "?" in DATABASE_URL:
             DATABASE_URL += "&sslmode=require"
         else:
             DATABASE_URL += "?sslmode=require"
 
 
-# DB connection
 engine = create_engine(
     DATABASE_URL,
-    pool_pre_ping=True,  # Testing for connection with db
+    pool_pre_ping=True,
     pool_recycle=300,
     )
 
-# Pydantic Model
+
 class Detail(BaseModel):
     id : int
     title : str
@@ -78,18 +76,12 @@ class SuggestMultiResponse(BaseModel):
     summary: str
 
 
-
-
-# Developing FastAPI app
 app = FastAPI(
     title = "PiAxis mini detail library",
     description = "API for architectural detail suggestions",
     version = '1.0.0'
 )
 
-
-
-# CORS Middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -110,8 +102,7 @@ def row_to_detail(row) -> Detail:
         description=row[4]
     )
 
-# API ENDPOINTS
-# ENDPOINT1 : GET/details
+
 @app.get("/details", response_model=List[Detail])
 def list_details():
     with engine.connect() as conn:
@@ -124,11 +115,10 @@ def list_details():
         details = [row_to_detail(row) for row in result]
     return details
 
-# ENDPOINT2 : GET /details/search
+
 @app.get("/details/search", response_model=List[Detail])
 def search_details(q:str = Query(..., min_length=1, description="Search query")):
     search_pattern = f"%{q}%"
-    
 
     with engine.connect() as conn:
         result = conn.execute(text("""
@@ -149,13 +139,10 @@ def search_details(q:str = Query(..., min_length=1, description="Search query"))
         )
         
         details = [row_to_detail(row) for row in result]
-    
+
     return details
 
 
-
-
-#ENDPOINT3
 @app.post("/suggest-detail", response_model=SuggestResponse)
 def suggest_detail(request: SuggestRequest):
     with engine.connect() as conn:
@@ -203,9 +190,8 @@ def suggest_detail(request: SuggestRequest):
             f"• Internal Wall + Floor + Internal"
         )
         return SuggestResponse(detail=None, explanation=explanation)
-    
 
-# ENDPOINT4
+
 @app.get("/")
 def root():
     return {
@@ -219,7 +205,6 @@ def root():
     }
 
 
-# ENDPOINT5
 @app.post("/suggest-detail-rag", response_model=SuggestMultiResponse)
 def suggest_detail_rag(request : SuggestRequest):
     if not RAG_AVAILABLE:
@@ -251,17 +236,6 @@ def generate_embeddings():
     return {"message":f"Generated embeddings for {count} details"}
 
 
-
-
-# RLS ENDPOINT
-def get_current_user(x_user_email:str = Header(None), x_user_role:str = Header(None)):
-    # Simple header-based authetication.
-    ''' Heaader : 
-            X-USER-EMAIL : user email
-            X-USER-EMAIL : 'admin' or 'architect'
-    '''
-    return {'email': x_user_email, 'role': x_user_role}
-
 @app.get("/security/details", response_model=List[Detail])
 def get_secure_details(
     x_user_email: str = Header(None),
@@ -275,35 +249,32 @@ def get_secure_details(
 
     role = x_user_role.lower()
 
+    if role not in ["admin", "architect"]:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Invalid role '{role}'. Must be 'admin' or 'architect'"
+        )
+
     with engine.connect() as conn:
-        if role == "admin":
+        trans = conn.begin()
+        try:
+            conn.execute(text(f"SET LOCAL app.current_user_role = '{role}'"))
+
             result = conn.execute(text("""
-                SELECT id,title,category,tags,description
+                SELECT id, title, category, tags, description
                 FROM details
                 ORDER BY id
             """))
-        elif role == "architect":
-            result = conn.execute(
-                text("""
-                    SELECT id, title, category, tags, description 
-                    FROM details 
-                    WHERE source = 'standard' OR source IS NULL
-                    ORDER BY id
-                """)
-            )
-        else:
-            raise HTTPException(
-                status_code=403,
-                detail=f"Invalid role '{role}'. Must be 'admin' or 'architect'"
-            )
-        
-        details = [row_to_detail(row) for row in result]
-    
+
+            details = [row_to_detail(row) for row in result]
+            trans.commit()
+        except Exception as e:
+            trans.rollback()
+            raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
     return details
 
 
-
-# Running Server
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(
