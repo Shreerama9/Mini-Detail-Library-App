@@ -1,15 +1,33 @@
-import { useState, useEffect } from 'react';
-import { fetchDetails, searchDetails } from '../services/api';
+import { useState, useEffect, useRef } from 'react';
+import { fetchDetails, searchDetails, autocomplete } from '../services/api';
 
 export default function DetailsList() {
   const [details, setDetails] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [suggestions, setSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const inputRef = useRef(null);
 
   useEffect(() => {
     loadDetails();
   }, []);
+
+  // Autocomplete effect - triggers on query change
+  useEffect(() => {
+    if (searchQuery.length >= 2) {
+      const timer = setTimeout(async () => {
+        const data = await autocomplete(searchQuery);
+        setSuggestions(data.suggestions || []);
+        setShowSuggestions(true);
+      }, 300); // Debounce 300ms
+      return () => clearTimeout(timer);
+    } else {
+      setSuggestions([]);
+      setShowSuggestions(false);
+    }
+  }, [searchQuery]);
 
   const loadDetails = async () => {
     setLoading(true);
@@ -26,6 +44,7 @@ export default function DetailsList() {
 
   const handleSearch = async (e) => {
     e.preventDefault();
+    setShowSuggestions(false);
     if (!searchQuery.trim()) {
       loadDetails();
       return;
@@ -43,8 +62,17 @@ export default function DetailsList() {
     }
   };
 
+  const handleSuggestionClick = (suggestion) => {
+    setSearchQuery(suggestion);
+    setShowSuggestions(false);
+    // Trigger search with the selected suggestion
+    searchDetails(suggestion).then(data => setDetails(data));
+  };
+
   const handleClear = () => {
     setSearchQuery('');
+    setSuggestions([]);
+    setShowSuggestions(false);
     loadDetails();
   };
 
@@ -52,14 +80,34 @@ export default function DetailsList() {
     <div className="bg-white rounded-lg shadow-md p-6">
       <h2 className="text-xl font-semibold text-gray-800 mb-4">All Details</h2>
       
-      <form onSubmit={handleSearch} className="flex gap-2 mb-4">
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search by title, tags, or description..."
-          className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-        />
+      <form onSubmit={handleSearch} className="flex gap-2 mb-4 relative">
+        <div className="flex-1 relative">
+          <input
+            ref={inputRef}
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+            onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+            placeholder="Search by title, tags, or description..."
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          />
+          
+          {/* Autocomplete dropdown */}
+          {showSuggestions && suggestions.length > 0 && (
+            <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-md shadow-lg z-10 max-h-48 overflow-y-auto">
+              {suggestions.map((suggestion, index) => (
+                <div
+                  key={index}
+                  onMouseDown={() => handleSuggestionClick(suggestion)}
+                  className="px-3 py-2 hover:bg-blue-50 cursor-pointer text-gray-700"
+                >
+                  {suggestion}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
         <button
           type="submit"
           className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"

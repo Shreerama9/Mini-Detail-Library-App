@@ -30,8 +30,8 @@ export default function SuggestForm() {
 
   return (
     <div className="bg-white rounded-lg shadow-md p-6">
-      <h2 className="text-xl font-semibold text-gray-800 mb-4">Get Detail Suggestion</h2>
-      <p className="text-gray-600 text-sm mb-4">Provide your drawing context to get a recommended detail</p>
+      <h2 className="text-xl font-semibold text-gray-800 mb-4">Get Detail Suggestions</h2>
+      <p className="text-gray-600 text-sm mb-4">Provide your drawing context to get AI-powered recommendations</p>
       
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
@@ -83,7 +83,7 @@ export default function SuggestForm() {
           disabled={loading}
           className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 disabled:bg-blue-400 transition-colors"
         >
-          {loading ? 'Getting Suggestion...' : 'Get Suggestion'}
+          {loading ? 'Getting Suggestions...' : 'Get Suggestions'}
         </button>
       </form>
 
@@ -94,32 +94,41 @@ export default function SuggestForm() {
       )}
 
       {result && (
-        <div className="mt-6 p-4 bg-gray-50 rounded-md">
-          <h3 className="font-semibold text-gray-800 mb-2">Suggested Detail</h3>
+        <div className="mt-6">
+          <h3 className="font-semibold text-gray-800 mb-2">{result.summary}</h3>
           
-          {result.detail ? (
-            <div className="mb-4 p-3 bg-white border border-gray-200 rounded-md">
-              <h4 className="font-medium text-blue-600">{result.detail.title}</h4>
-              <span className="inline-block mt-1 px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">
-                {result.detail.category}
-              </span>
-              <p className="mt-2 text-gray-600 text-sm">{result.detail.description}</p>
-              <div className="mt-2 flex flex-wrap gap-1">
-                {result.detail.tags.map((tag, i) => (
-                  <span key={i} className="px-2 py-0.5 bg-gray-200 text-gray-700 text-xs rounded">
-                    {tag}
+          {result.suggestions && result.suggestions.length > 0 ? (
+            <div className="space-y-4">
+              {result.suggestions.map((suggestion, index) => (
+                <div key={suggestion.id} className="p-4 bg-gray-50 rounded-md border border-gray-200">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="inline-flex items-center justify-center w-6 h-6 bg-blue-600 text-white text-sm font-bold rounded-full">
+                      {suggestion.rank}
+                    </span>
+                    <h4 className="font-medium text-blue-600">{suggestion.title}</h4>
+                  </div>
+                  <span className="inline-block px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">
+                    {suggestion.category}
                   </span>
-                ))}
-              </div>
+                  <p className="mt-2 text-gray-600 text-sm">{suggestion.description}</p>
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {suggestion.tags.map((tag, i) => (
+                      <span key={i} className="px-2 py-0.5 bg-gray-200 text-gray-700 text-xs rounded">
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                  
+                  <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-md">
+                    <h5 className="font-medium text-amber-800 text-sm mb-1">Why this detail?</h5>
+                    <p className="text-amber-700 text-sm whitespace-pre-line">{suggestion.reason}</p>
+                  </div>
+                </div>
+              ))}
             </div>
           ) : (
-            <p className="text-gray-500 italic mb-4">No matching detail found</p>
+            <p className="text-gray-500 italic">No matching details found</p>
           )}
-          
-          <div className="p-3 bg-amber-50 border border-amber-200 rounded-md">
-            <h4 className="font-medium text-amber-800 mb-1">Explanation</h4>
-            <p className="text-amber-700 text-sm whitespace-pre-line">{result.explanation}</p>
-          </div>
         </div>
       )}
     </div>
