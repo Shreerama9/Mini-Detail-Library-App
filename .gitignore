@@ -6,7 +6,7 @@
 # VSCODE
 .vscode
 .history
-
+tmp.txt
 
 # Python - virtrualenv
 .venv/
