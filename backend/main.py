@@ -6,6 +6,12 @@ from sqlalchemy import create_engine, text
 from dotenv import load_dotenv
 import os
 
+#Checking for RAG Integerations
+try:
+    from rag_service import rag_suggest_detail, generate_embeddings_for_details
+    RAG_AVAILABLE = True
+except ImportError:
+    RAG_AVAILABLE = False
 
 load_dotenv()
 
@@ -57,6 +63,21 @@ class SuggestResponse(BaseModel):
     explanation : str
 
 
+class DetailWithReason(BaseModel):
+    id: int
+    title: str
+    category: str
+    tags: List[str]
+    description: str
+    reason: str
+    rank: int
+
+
+class SuggestMultiResponse(BaseModel):
+    suggestions: List[DetailWithReason]
+    summary: str
+
+
 
 
 # Developing FastAPI app
@@ -89,7 +110,7 @@ def row_to_detail(row) -> Detail:
         description=row[4]
     )
 
-
+# API ENDPOINTS
 # ENDPOINT1 : GET/details
 @app.get("/details", response_model=List[Detail])
 def list_details():
@@ -198,7 +219,91 @@ def root():
     }
 
 
+# ENDPOINT5
+@app.post("/suggest-detail-rag", response_model=SuggestMultiResponse)
+def suggest_detail_rag(request : SuggestRequest):
+    if not RAG_AVAILABLE:
+        raise HTTPException(status_code=503, detail = "RAG Service not available")
+    
+    suggestions, summary = rag_suggest_detail(
+        engine,
+        request.host_element,
+        request.adjacent_element,
+        request.exposure,
+        top_n=2
+    )
 
+    if suggestions:
+        return SuggestMultiResponse(
+            suggestions= [DetailWithReason(**s) for s in suggestions],
+            summary = summary
+        )
+    else:
+        return SuggestMultiResponse(suggestions=[], summary=summary)
+    
+
+@app.post("/generate-embeddings")
+def generate_embeddings():
+    if not RAG_AVAILABLE:
+        raise HTTPException(status_code=503, detail="RAG service not available")
+    
+    count = generate_embeddings_for_details(engine)
+    return {"message":f"Generated embeddings for {count} details"}
+
+
+
+
+# RLS ENDPOINT
+def get_current_user(x_user_email:str = Header(None), x_user_role:str = Header(None)):
+    # Simple header-based authetication.
+    ''' Heaader : 
+            X-USER-EMAIL : user email
+            X-USER-EMAIL : 'admin' or 'architect'
+    '''
+    return {'email': x_user_email, 'role': x_user_role}
+
+@app.get("/security/details", response_model=List[Detail])
+def get_secure_details(
+    x_user_email: str = Header(None),
+    x_user_role: str = Header(None)
+):
+    if not x_user_role:
+        raise HTTPException(
+            status_code = 401,
+            detail="Missing X-USER-ROLE header"
+        )
+
+    role = x_user_role.lower()
+
+    with engine.connect() as conn:
+        if role == "admin":
+            result = conn.execute(text("""
+                SELECT id,title,category,tags,description
+                FROM details
+                ORDER BY id
+            """))
+        elif role == "architect":
+            result = conn.execute(
+                text("""
+                    SELECT id, title, category, tags, description 
+                    FROM details 
+                    WHERE source = 'standard' OR source IS NULL
+                    ORDER BY id
+                """)
+            )
+        else:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Invalid role '{role}'. Must be 'admin' or 'architect'"
+            )
+        
+        details = [row_to_detail(row) for row in result]
+    
+    return details
+
+
+
+# Running Server
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(
