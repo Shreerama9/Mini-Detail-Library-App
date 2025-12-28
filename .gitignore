@@ -1,17 +1,112 @@
 
-# environment files
+# Environment files
 .env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
 *.env.local
 
-# VSCODE
-.vscode
-.history
+# IDE / Editor
+.vscode/
+.idea/
+.history/
+*.swp
+*.swo
+*~
+*.sublime-workspace
+*.sublime-project
+.project
+.classpath
+.settings/
+
+# Temporary files
 tmp.txt
+tmp/
+temp/
+*.tmp
+*.bak
 
-# Python - virtrualenv
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
 .venv/
+venv/
+ENV/
+env/
+.virtualenv
 
-# Database OS Files
+# Python testing
+.pytest_cache/
+.coverage
+.tox/
+.nox/
+htmlcov/
+.hypothesis/
+*.cover
+
+# Frontend - React / Node.js / Vite
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-store/
+dist/
+dist-ssr/
+*.local
+
+# Build outputs
+build/
+out/
+.next/
+.nuxt/
+.cache/
+.parcel-cache/
+.output/
+
+# Logs
+logs/
+*.log
+lerna-debug.log*
+
+# Testing
+coverage/
+.nyc_output/
+.eslintcache
+
+# OS Files
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
+Desktop.ini
 
+# Misc
+*.tsbuildinfo

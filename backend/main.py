@@ -14,8 +14,29 @@ if not DATABASE_URL:
     raise ValueError("DATABASE_URL environment variable is not set!")
 
 
+
+if DATABASE_URL.startswith("postgresql://"):
+    DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+psycopg://", 1)
+
+if "sslmode" not in DATABASE_URL:
+    if "localhost" in DATABASE_URL or "127.0.0.1" in DATABASE_URL:
+        if "?" in DATABASE_URL: # For locally hosted postgress
+            DATABASE_URL += "&sslmode=disable"
+        else:
+            DATABASE_URL += "?sslmode=disable"
+    else:               # For Supabase Cloud
+        if "?" in DATABASE_URL:
+            DATABASE_URL += "&sslmode=require"
+        else:
+            DATABASE_URL += "?sslmode=require"
+
+
 # DB connection
-engine = create_engine(DATABASE_URL)
+engine = create_engine(
+    DATABASE_URL,
+    pool_pre_ping=True,  # Testing for connection with db
+    pool_recycle=300,
+    )
 
 # Pydantic Model
 class Detail(BaseModel):
@@ -32,7 +53,7 @@ class SuggestRequest(BaseModel):
 
 
 class SuggestResponse(BaseModel):
-    detail : Optional
+    detail : Optional[Detail]
     explanation : str
 
 
