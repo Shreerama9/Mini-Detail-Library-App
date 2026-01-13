@@ -1,4 +1,4 @@
-# PiAxis Mini Detail Library
+# Architectural Detail Library
 
 Hey there! This is a full-stack app that helps architects find the right building details for their projects. Think of it as a smart search engine that understands architectural contexts and suggests the best construction details based on what you're working with.
 
@@ -50,7 +50,7 @@ The easiest way to set up the database is using our automated setup script:
    ```
 
    The script will:
-   - Create the database (default: `piaxis_db`)
+   - Create the database (default: `architectural_library_db`)
    - Install the pgvector extension
    - Create all tables (details, detail_usage_rules, users)
    - Apply Row-Level Security policies
@@ -68,8 +68,8 @@ If you prefer to set up manually or the script doesn't work:
 psql -U postgres
 
 # Create database
-CREATE DATABASE piaxis_db;
-\c piaxis_db
+CREATE DATABASE architectural_library_db;
+\c architectural_library_db
 
 # Run the schema, policies, and seed files
 \i schema.sql

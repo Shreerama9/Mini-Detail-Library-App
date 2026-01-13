@@ -77,7 +77,7 @@ class SuggestMultiResponse(BaseModel):
 
 
 app = FastAPI(
-    title = "PiAxis mini detail library",
+    title = "Architectural Detail Library",
     description = "API for architectural detail suggestions",
     version = '1.0.0'
 )
@@ -195,7 +195,7 @@ def suggest_detail(request: SuggestRequest):
 @app.get("/")
 def root():
     return {
-        "message": "PiAxis Mini Detail Library API",
+        "message": "Architectural Detail Library API",
         "docs": "/docs",
         "endpoints": [
             "GET /details - List all details",
